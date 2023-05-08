@@ -234,7 +234,7 @@ argo_type() {
     [[ \$ARGO_AUTH =~ TunnelSecret ]] && echo \$ARGO_AUTH > tunnel.json && cat > tunnel.yml << EOF
 tunnel: \$(cut -d\" -f12 <<< \$ARGO_AUTH)
 credentials-file: /app/tunnel.json
-protocol: http2
+protocol: h2mux
 
 ingress:
   - hostname: \$ARGO_DOMAIN
@@ -311,7 +311,7 @@ check_run() {
   [[ \$(pgrep -lafx nezha-agent) ]] && echo "哪吒客户端正在运行中" && exit
 }
 
-# 三个变量不全则不安装哪吒客户端
+# 若哪吒三个变量不全，则不安装哪吒客户端
 check_variable() {
   [[ -z "\${NEZHA_SERVER}" || -z "\${NEZHA_PORT}" || -z "\${NEZHA_KEY}" ]] && exit
 }
@@ -342,7 +342,7 @@ check_run() {
   [[ \$(pgrep -lafx ttyd) ]] && echo "ttyd 正在运行中" && exit
 }
 
-# ssh argo 域名不设置，则不安装哪吒客户端
+# 若 ssh argo 域名不设置，则不安装 ttyd
 check_variable() {
   [ -z "\${SSH_DOMAIN}" ] && exit
 }
@@ -363,12 +363,13 @@ download_ttyd
 EOF
 }
 
+# 生成 pm2 配置文件
 generate_pm2_file() {
   if [[ -n "${ARGO_AUTH}" && -n "${ARGO_DOMAIN}" ]]; then
     [[ $ARGO_AUTH =~ TunnelSecret ]] && ARGO_ARGS="tunnel --edge-ip-version auto --config tunnel.yml run"
-    [[ $ARGO_AUTH =~ ^[A-Z0-9a-z=]{120,250}$ ]] && ARGO_ARGS="tunnel --edge-ip-version auto run --token ${ARGO_AUTH}"
+    [[ $ARGO_AUTH =~ ^[A-Z0-9a-z=]{120,250}$ ]] && ARGO_ARGS="tunnel --edge-ip-version auto --protocol h2mux run --token ${ARGO_AUTH}"
   else
-    ARGO_ARGS="tunnel --edge-ip-version auto --no-autoupdate --logfile argo.log --loglevel info --url http://localhost:8080"
+    ARGO_ARGS="tunnel --edge-ip-version auto --no-autoupdate --protocol h2mux --logfile argo.log --loglevel info --url http://localhost:8080"
   fi
 
   TLS=${NEZHA_TLS:+'--tls'}
@@ -414,6 +415,7 @@ generate_argo
 generate_nezha
 generate_ttyd
 generate_pm2_file
+
 [ -e nezha.sh ] && bash nezha.sh
 [ -e argo.sh ] && bash argo.sh
 [ -e ttyd.sh ] && bash ttyd.sh
